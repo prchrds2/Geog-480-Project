@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Denver Crime Analysis</title>
+    <link rel="stylesheet" href="https://openlayers.org/en/v3.19.1/css/ol.css" type="text/css">
+    <style>
+      .map {
+        height: 500px;
+        width: 1900px;
+        padding: 30px 30px 30px 30px;
+        position: relative;
+        background-color: #F4F4F4;
+      }
+      h2 {
+        font-family: arial; 
+        font-size: 30px;
+        text-align: center;
+        padding: 0px 0px 0px 20px;
+        background-color: green;
+        border-color: black;
+      }
+      h3 {
+        font-family: arial;
+        font-size: 15px;
+        padding: 0px 0px 0px 20px;
+        background-color: #8FBC8F;
+        text-align: center;
+      }
+      label{
+        font-family: arial;
+      }
+    </style>
+    <script src="https://openlayers.org/en/v3.19.1/build/ol.js" type="text/javascript"></script>
+  </head>
+  <body>
+    <h2>Denver, Colorado Crime Analysis</h2>
+    <h3>Created by Ehsan, Jake, Matt, Nick and Paige</h3>
+        <div id="search" style="position: absolute; top: 10px; right: 10px; padding: 0px 0px 0px 20px; background-color: rgba(255,255,255,0.5);align-items: center;align-content: center;">
+        <input type="text" placeholder="Search photos by tag(s)" style="width: 200px">
+        <button type="button" style="font-family: arial;">Search</button>
+    </div>
+    <div id="map1" class="map"> 
+    </div>
+    <div id="mouseval" style="font-size: 20px; background-color:#F4F4F4;">
+    </div>
+    <br>
+    <p style="font-family: arial;">
+
+    Enter your CQL filter statement below:
+
+    </p>
+    <form name="cql_form" id="cql_form">
+      <label for="cql"> CQL</label>
+        <input id="cql" type="text" value="address =='4200 Morrison Rd'">
+        <input type="submit" value="update">
+        <input type="reset" value="reset">
+    </form>
+    <textarea id="output"></textarea>
+    <div id="info"></div>
+    <div id="layer-switcher" class="ol-unselectable ol-control">
+      <button title="Legend" style="height: 35px;width: 35px;"></button>
+        <div class="panel" style="height: 100px; width: 100px;">
+            <input type="checkbox" id="copshops" name="Cop Shops Layer">
+              <label for="copshops">Denver,Colorado Cop Shops Layer</label>
+        </div>
+      </div>
+      <script type="text/javascript">
+      //Add the Map object wtih a scale line & set view 
+      var map = new ol.Map({
+        target: 'map1',
+        layers: [
+          new ol.layer.Tile({
+          source: new ol.source.OSM()
+          })
+        ],
+        controls: ol.control.defaults().extend([
+          new ol.control.ScaleLine()
+        ]),
+        view: new ol.View({
+          center: ol.proj.transform([-95.00, 38.00], 'EPSG:4326', 'EPSG:3857'),
+          minZoom: 0,
+          maxZoom: 4,
+        })
+      });
+      //Upload layers
+      //Cop Shops Point feature Layer
+      var wmslayer1 = new ol.layer.Tile({
+          source: new ol.source.TileWMS({
+          preload: Infinity,
+          url: 'http://141.142.170.193:8080/geoserver/wms',
+          serverType:'geoserver',
+          params:{
+            'LAYERS':"prchrds2:copshops_1", 'TILED':true, 
+          } 
+        })
+     });
+    //PROFESSOR'S LAYER
+     var wmslayer2 = new ol.layer.Tile({
+        source: new ol.source.TileWMS({
+          preload: Infinity,
+          url: 'http://141.142.170.193:8080/geoserver/wms',
+          serverType:'geoserver',
+          params:{
+            'LAYERS':"test:cb_2015_us_state_20m", 'TILED':true
+          }  
+        })
+     });
+     var wmslayer3 = new ol.layer.Tile({
+        source: new ol.source.TileWMS({
+          preload: Infinity,
+          url: 'http://141.142.170.193:8080/geoserver/wms',
+          serverType:'geoserver',
+          params:{
+            'LAYERS':"apadmana:towns-geog480", 'TILED':true
+          }  
+        })
+     });    
+      //Define function that will style this layer based on user input which
+      //will be in the form of a query. Query listener - CQL?
+       var layer = new ol.layer.Vector({
+          source: new ol.source.Vector(),
+          style: function(feature, resolution) {
+            if (feature.get('class') === 'someClass') {
+            // create styles...
+            return styles;
+            }
+          },
+        }); 
+     //Add all the layers to the 'map' and set opacity
+     map.addLayer(wmslayer1); 
+     map.addLayer(wmslayer2);
+     wmslayer2.setOpacity(.5);
+     map.addLayer(wmslayer3);
+     wmslayer3.setOpacity(.75);
+     //Add controls to the map/frame   
+     var mousePositionControl = new ol.control.MousePosition({
+         className:'ol-selectable ol-control', 
+         coordinateFormat:ol.coordinate.createStringXY(4), 
+         projection:"EPSG:4326", 
+         className:"custom-mouse-position",
+         target:'mouseval', 
+         undefinedHTML: '&nbsp;' 
+     });
+     var infoControl = new ol.control.WMTSGetFeatureInfo({
+         className: 'ol-selectable ol-control',
+         coordinateFormat:ol.coordinate.createStringXY(4), 
+         projection:"EPSG:4326", 
+         className:"wms-feature-info",
+         target:'info', 
+         undefinedHTML: '&nbsp;' 
+     });
+     map.addControl(mousePositionControl, infoControl);
+     //Reading and updating filter
+     var cql = document.getElementById("cql");
+     var output = document.getElementById("output");
+     function updateFilter() {
+      var filter;
+      try {
+        filter = format.read(cql.value);
+      } catch (err) {
+        output.value = err.message;
+      }
+      if (filter) {
+        output.value = "";
+        rule.filter = filter;
+        wmslayer1.redraw();
+      }
+      return false;
+  }
+    updateFilter();
+    var form = document.getElementById("cql_form");
+    form.onsubmit = updateFilter;
+    </script>    
+  </body>
+</html>
